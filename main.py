@@ -220,7 +220,6 @@ class DatabaseHandler:
         # 履歴を再読み込み
         self.load_history()
 
-
 # SettingsWindowクラス
 class SettingsWindow(QtWidgets.QDialog):
     def __init__(self, parent=None):
@@ -308,7 +307,7 @@ class SettingsWindow(QtWidgets.QDialog):
             if os.path.exists(shortcut_path):  # ショートカットファイルが存在するか確認
                 os.remove(shortcut_path)  # ショートカットファイルを削除
                 QMessageBox.information(self, "ショートカット削除",
-                                        "ショートカットが正常に削除されました。")  # 削除完了のメッセージを表示
+                    "ショートカットが正常に削除されました。")  # 削除完了のメッセージを表示
         except Exception as e:
             QMessageBox.warning(self, "エラー", f"ショートカットの削除中にエラーが発生しました: {e}")  # エラーメッセージを表示
 
