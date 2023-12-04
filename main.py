@@ -113,8 +113,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # 履歴をクリアする処理を実装
         pass
 
-        # 設定ウィンドウを開く機能
-
+    # 設定ウィンドウを開く機能
     def open_settings(self):
         settings_window = SettingsWindow(self)  # self を渡して MainWindow を親として設定
         settings_window.exec_()
@@ -326,43 +325,46 @@ class SettingsWindow(QtWidgets.QDialog):
 
 
 class ShortcutCreationThread(QThread):
-    shortcutCreated = QtCore.pyqtSignal()
-    shortcutCreationFailed = QtCore.pyqtSignal(str)
+    shortcutCreated = QtCore.pyqtSignal()  # ショートカットが正常に作成されたときに発信するシグナル
+    shortcutCreationFailed = QtCore.pyqtSignal(str)  # ショートカットの作成中にエラーが発生したときに発信するシグナル
 
     def __init__(self, app_path, shortcut_name):
         super().__init__()
-        self.app_path = app_path
-        self.shortcut_name = shortcut_name
+        self.app_path = app_path  # アプリケーションのパス
+        self.shortcut_name = shortcut_name  # ショートカットの名前
 
     def run(self):
-        # Initialize COM library
+        # COM ライブラリを初期化
         pythoncom.CoInitialize()
 
         try:
+            # Windowsのスタートアップフォルダを取得
             startup_dir = winshell.startup()
+            # ショートカットファイルのパスを構築
             shortcut_path = os.path.join(startup_dir, f"{self.shortcut_name}.lnk")
+            # ショートカットを作成および設定
             with winshell.shortcut(shortcut_path) as shortcut:
-                shortcut.path = self.app_path
-                shortcut.working_directory = os.path.dirname(self.app_path)
-                shortcut.description = self.shortcut_name
-                shortcut.write()
-            self.shortcutCreated.emit()
+                shortcut.path = self.app_path  # アプリケーションの実行パスを設定
+                shortcut.working_directory = os.path.dirname(self.app_path)  # 作業ディレクトリを設定
+                shortcut.description = self.shortcut_name  # ショートカットの説明を設定
+                shortcut.write()  # ショートカットを書き込む
+            self.shortcutCreated.emit()  # ショートカット作成が成功したことを通知
         except Exception as e:
-            self.shortcutCreationFailed.emit(str(e))
+            self.shortcutCreationFailed.emit(str(e))  # エラーが発生したことを通知
         finally:
-            # Uninitialized the COM library
+            # COM ライブラリを終了
             pythoncom.CoUninitialize()
 
 
 # SettingsWindowクラスの create_shortcut メソッドの変更
 def create_shortcut(self):
-    if self.shortcutCheckbox.isChecked():
-        app_path = os.path.abspath(sys.argv[0])
-        shortcut_name = "MyPyQtApp"
-        self.thread = ShortcutCreationThread(app_path, shortcut_name)
-        self.thread.shortcutCreated.connect(self.shortcut_created)  # 新しいスタイルで接続
-        self.thread.shortcutCreationFailed.connect(self.shortcut_creation_failed)  # 新しいスタイルで接続
-        self.thread.start()
+    if self.shortcutCheckbox.isChecked():  # ショートカット作成のチェックボックスがチェックされているか確認
+        app_path = os.path.abspath(sys.argv[0])  # アプリケーションの実行パスを取得
+        shortcut_name = "MyPyQtApp"  # ショートカットの名前
+        self.thread = ShortcutCreationThread(app_path, shortcut_name)  # ショートカット作成用スレッドを作成
+        self.thread.shortcutCreated.connect(self.shortcut_created)  # ショートカット作成成功時のシグナルを接続
+        self.thread.shortcutCreationFailed.connect(self.shortcut_creation_failed)  # ショートカット作成エラー時のシグナルを接続
+        self.thread.start()  # スレッドを開始
 
 
 def shortcut_created(self):
