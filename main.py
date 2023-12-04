@@ -24,15 +24,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('ファイル名を指定して実行')
-        self.setWindowIcon(QtGui.QIcon('app2.ico'))
-        self.setFixedSize(400, 150)
-        self.setStyleSheet("background-color: white;")
+        # ウィンドウの設定
+        self.setWindowTitle('ファイル名を指定して実行')  # ウィンドウのタイトルを設定
+        self.setWindowIcon(QtGui.QIcon('app2.ico'))  # ウィンドウのアイコンを設定
+        self.setFixedSize(400, 150)  # ウィンドウの固定サイズを設定
+        self.setStyleSheet("background-color: white;")  # ウィンドウの背景色を設定
 
         # コンボボックスの初期化と定義
-        self.comboBox = QtWidgets.QComboBox(self)  # ここで comboBox を定義
-        self.comboBox.setEditable(True)
-        self.comboBox.setGeometry(50, 40, 338, 30)
+        self.comboBox = QtWidgets.QComboBox(self)  # comboBox オブジェクトを作成し、親ウィンドウを指定
+        self.comboBox.setEditable(True)  # コンボボックスを編集可能に設定
+        self.comboBox.setGeometry(50, 40, 338, 30)  # コンボボックスの位置とサイズを設定
 
         # アイコンの追加
         self.iconLabel = QtWidgets.QLabel(self)
@@ -47,36 +48,36 @@ class MainWindow(QtWidgets.QMainWindow):
         self.descriptionLabel.setGeometry(50, 10, 340, 20)  # 位置を調整
 
         # コンボボックスの位置を調整（説明文の下に）
-        self.label = QtWidgets.QLabel('パス:', self)
-        self.label.setGeometry(15, 40, 40, 30)
-        self.comboBox.setEditable(True)
-        self.comboBox.setGeometry(50, 40, 338, 30)
+        self.label = QtWidgets.QLabel('パス:', self)  # ラベルを作成し、親ウィンドウを指定
+        self.label.setGeometry(15, 40, 40, 30)  # ラベルの位置とサイズを設定
+        self.comboBox.setEditable(True)  # コンボボックスを編集可能に設定
+        self.comboBox.setGeometry(50, 40, 338, 30)  # コンボボックスの位置とサイズを設定
 
         # フレームの作成と設定（縦のサイズを大きくする）
-        frame = QtWidgets.QFrame(self)
-        frame.setGeometry(-10, 85, 410, 70)  # 縦のサイズを70ピクセルに変更
-        frame.setStyleSheet("background-color: #F0F0F0;")
+        frame = QtWidgets.QFrame(self)  # フレームを作成し、親ウィンドウを指定
+        frame.setGeometry(-10, 85, 410, 70)  # フレームの位置とサイズを設定（縦のサイズを70ピクセルに変更）
+        frame.setStyleSheet("background-color: #F0F0F0;")  # フレームの背景色を設定
 
         # ボタンの作成とサイズ設定
-        button1 = QtWidgets.QPushButton('開く', frame)
-        button1.setFixedSize(80, 30)  # 幅80px, 高さ30pxに設定
-        button2 = QtWidgets.QPushButton('クリア', frame)
+        button1 = QtWidgets.QPushButton('開く', frame)  # ボタン1を作成し、親フレームを指定
+        button1.setFixedSize(80, 30)  # ボタンの幅と高さを設定
+        button2 = QtWidgets.QPushButton('クリア', frame)  # ボタン2を作成し、親フレームを指定
         button2.setFixedSize(80, 30)  # 同上
-        button3 = QtWidgets.QPushButton('設定', frame)
+        button3 = QtWidgets.QPushButton('設定', frame)  # ボタン3を作成し、親フレームを指定
         button3.setFixedSize(80, 30)  # 同上
 
         # ボタンのシグナルを設定
-        button1.clicked.connect(self.open_file)
-        button2.clicked.connect(self.clear_combo_box)  # クリアボタンがクリックされたときの処理を設定
-        button3.clicked.connect(self.open_settings)
+        button1.clicked.connect(self.open_file)  # ボタン1がクリックされたときの処理を設定
+        button2.clicked.connect(self.clear_combo_box)  # ボタン2がクリックされたときの処理を設定
+        button3.clicked.connect(self.open_settings)  # ボタン3がクリックされたときの処理を設定
 
         # レイアウトの設定（水平方向にボタンを並べて右揃えにする）
-        layout = QtWidgets.QHBoxLayout()
+        layout = QtWidgets.QHBoxLayout()  # 水平ボックスレイアウトを作成
         layout.addStretch(1)  # スペースを追加して右揃えにする
-        layout.addWidget(button1)
-        layout.addWidget(button2)
-        layout.addWidget(button3)
-        frame.setLayout(layout)
+        layout.addWidget(button1)  # ボタン1をレイアウトに追加
+        layout.addWidget(button2)  # ボタン2をレイアウトに追加
+        layout.addWidget(button3)  # ボタン3をレイアウトに追加
+        frame.setLayout(layout)  # フレームにレイアウトを設定
 
         # Enterキーが押されたときのシグナルを設定
         self.comboBox.lineEdit().returnPressed.connect(self.open_file)
@@ -160,20 +161,19 @@ class DatabaseHandler:
         # 履歴データを取得して、親ウィンドウのメソッドを通じてコンボボックスに設定
         self.cursor.execute('SELECT command FROM history ORDER BY ROWID DESC LIMIT 6')
         history_data = [row[0] for row in self.cursor.fetchall()]
-        self.parent.update_combo_box(history_data)
+        self.parent.update_combo_box(history_data)  # 親ウィンドウのメソッドを呼び出してコンボボックスにデータを設定
 
     def load_shortcut_flag(self):
         self.cursor.execute('SELECT created FROM shortcut')
         result = self.cursor.fetchone()
         if result:
-            self.parent.shortcutCheckbox.setChecked(bool(result[0]))
+            self.parent.shortcutCheckbox.setChecked(bool(result[0]))  # ショートカット作成フラグを親ウィンドウのチェックボックスに設定
 
-        # ショートカット作成フラグを保存する関数
-
+    # ショートカット作成フラグを保存する関数
     def save_shortcut_flag(self, created):
-        self.cursor.execute('DELETE FROM shortcut')
-        self.cursor.execute('INSERT INTO shortcut (created) VALUES (?)', (int(created),))
-        self.conn.commit()
+        self.cursor.execute('DELETE FROM shortcut')  # 既存のデータを削除
+        self.cursor.execute('INSERT INTO shortcut (created) VALUES (?)', (int(created),))  # 新しいデータを挿入
+        self.conn.commit()  # 変更をコミット
 
         # コマンドを履歴に保存する関数
 
@@ -266,13 +266,15 @@ class SettingsWindow(QtWidgets.QDialog):
 
     # ショートカットを作成する関数
     def create_shortcut(self):
-        if self.shortcutCheckbox.isChecked():
-            app_path = os.path.abspath(sys.argv[0])
-            shortcut_name = "MyPyQtApp"
+        if self.shortcutCheckbox.isChecked():  # ショートカット作成チェックボックスがチェックされているか確認
+            app_path = os.path.abspath(sys.argv[0])  # アプリケーションの実行パスを取得
+            shortcut_name = "MyPyQtApp"  # 作成するショートカットの名前を指定
+
+            # ShortcutCreationThreadを作成し、必要なシグナルに接続
             self.thread = ShortcutCreationThread(app_path, shortcut_name)
-            self.thread.shortcutCreated.connect(self.shortcut_created)
-            self.thread.shortcutCreationFailed.connect(self.shortcut_creation_failed)
-            self.thread.start()
+            self.thread.shortcutCreated.connect(self.shortcut_created)  # ショートカット作成成功時のコールバックを設定
+            self.thread.shortcutCreationFailed.connect(self.shortcut_creation_failed)  # ショートカット作成失敗時のコールバックを設定
+            self.thread.start()  # スレッドを開始
 
     def shortcut_created(self):
         QMessageBox.information(self, "ショートカット作成", "ショートカットが正常に作成されました。")
@@ -298,15 +300,17 @@ class SettingsWindow(QtWidgets.QDialog):
         return os.path.exists(shortcut_path)
 
     def delete_shortcut(self):
-        shortcut_name = "MyPyQtApp"
+        shortcut_name = "MyPyQtApp"  # 削除するショートカットの名前を指定
         try:
-            startup_dir = winshell.startup()
-            shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
-            if os.path.exists(shortcut_path):
-                os.remove(shortcut_path)
-                QMessageBox.information(self, "ショートカット削除", "ショートカットが正常に削除されました。")
+            startup_dir = winshell.startup()  # スタートアップフォルダのパスを取得
+            shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")  # ショートカットファイルのパスを構築
+
+            if os.path.exists(shortcut_path):  # ショートカットファイルが存在するか確認
+                os.remove(shortcut_path)  # ショートカットファイルを削除
+                QMessageBox.information(self, "ショートカット削除",
+                                        "ショートカットが正常に削除されました。")  # 削除完了のメッセージを表示
         except Exception as e:
-            QMessageBox.warning(self, "エラー", f"ショートカットの削除中にエラーが発生しました: {e}")
+            QMessageBox.warning(self, "エラー", f"ショートカットの削除中にエラーが発生しました: {e}")  # エラーメッセージを表示
 
     def on_ok_clicked(self):
         # チェックボックスがチェックされているか確認
@@ -376,34 +380,37 @@ def shortcut_creation_failed(self, error):
 
 
 class OpenFileThread(QThread):
-    errorOccurred = QtCore.pyqtSignal(str)
+    errorOccurred = QtCore.pyqtSignal(str)  # エラーが発生したときにエラーメッセージを通知するシグナル
 
     def __init__(self, path, parent=None):
         super().__init__(parent)
-        self.path = path
+        self.path = path  # 開くファイルまたはディレクトリのパス
 
     def run(self):
-        if os.path.exists(self.path):
-            if os.path.isdir(self.path):
+        if os.path.exists(self.path):  # パスが存在するか確認
+            if os.path.isdir(self.path):  # パスがディレクトリであるか確認
+                # ディレクトリをエクスプローラーで開く
                 subprocess.Popen(f'explorer "{self.path}"')
             else:
+                # ファイルを実行（シェルを通じて）
                 subprocess.Popen([self.path], shell=True)
         elif self.path.startswith('cmd ') or self.path.startswith('shell:'):
+            # コマンドを実行（シェルを通じて）
             subprocess.Popen(self.path, shell=True)
         else:
+            # 無効なパスまたはコマンドの場合、エラーを通知
             self.errorOccurred.emit("無効なパスまたはコマンドです")
-
 
 # MainWindowの open_file メソッドで使用される subprocess.Popen も、
 # 必要に応じてスレッドやプロセスで実行することが可能です。
 # アプリケーションを実行する
 def main():
-    app = QtWidgets.QApplication(sys.argv)
-    apply_stylesheet(app, theme='light_blue.xml')
-    main_win = MainWindow()
-    main_win.show()
-    sys.exit(app.exec_())
+    app = QtWidgets.QApplication(sys.argv)  # QApplicationのインスタンスを作成
+    apply_stylesheet(app, theme='light_blue.xml')  # スタイルシートを適用
+    main_win = MainWindow()  # MainWindowのインスタンスを作成
+    main_win.show()  # MainWindowを表示
+    sys.exit(app.exec_())  # アプリケーションの実行とイベントループの開始
 
 
 if __name__ == '__main__':
-    main()
+    main()  # メイン関数を呼び出し、プログラムを実行
