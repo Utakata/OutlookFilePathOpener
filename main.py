@@ -1,15 +1,15 @@
-import sys
 import os
 import re
-import subprocess
 import sqlite3
-import winshell
-import pythoncom
+import subprocess
+import sys
 
+import pythoncom
+import winshell
 from PyQt5 import QtWidgets, QtGui, QtCore
-from qt_material import apply_stylesheet
-from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import QThread
+from PyQt5.QtWidgets import QMessageBox
+from qt_material import apply_stylesheet
 
 
 # UIの構造を定義するクラス
@@ -400,6 +400,7 @@ class OpenFileThread(QThread):
         else:
             # 無効なパスまたはコマンドの場合、エラーを通知
             self.errorOccurred.emit("無効なパスまたはコマンドです")
+
 
 # MainWindowの open_file メソッドで使用される subprocess.Popen も、
 # 必要に応じてスレッドやプロセスで実行することが可能です。
