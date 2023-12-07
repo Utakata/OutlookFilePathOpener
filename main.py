@@ -5,7 +5,6 @@ import subprocess
 import sys
 
 import pythoncom
-import winshell
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import QThread
 from PyQt5.QtWidgets import QMessageBox
@@ -82,6 +81,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Enterキーが押されたときのシグナルを設定
         self.comboBox.lineEdit().returnPressed.connect(self.open_file)
 
+    def clear_history(self):
+        # 履歴をクリアする処理を実装
+        self.databaseHandler.clear_history()
+        QMessageBox.information(self, "履歴クリア", "履歴がクリアされました。")
     def load_history_from_db(self):
         history_data = self.databaseHandler.load_history()
         self.update_combo_box(history_data)
@@ -174,25 +177,7 @@ class DatabaseHandler:
         self.cursor.execute('DELETE FROM shortcut')  # 既存のデータを削除
         self.cursor.execute('INSERT INTO shortcut (created) VALUES (?)', (int(created),))  # 新しいデータを挿入
         self.conn.commit()  # 変更をコミット
-
         # コマンドを履歴に保存する関数
-
-    @staticmethod
-    def is_shortcut_created(shortcut_name):
-        """
-        指定されたショートカットが作成されているかどうかを確認します。
-
-        :param shortcut_name: 確認するショートカットの名前。
-        :return: ショートカットが存在する場合はTrue、そうでない場合はFalse。
-        """
-        # Windowsのスタートアップフォルダのパスを取得
-        startup_dir = winshell.startup()
-
-        # ショートカットの完全なパスを構築
-        shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
-
-        # ショートカットファイルが存在するかどうかを確認
-        return os.path.exists(shortcut_path)
 
     def save_history(self, command):
         # 履歴を過去5つ以外削除
@@ -220,96 +205,92 @@ class DatabaseHandler:
         # 履歴を再読み込み
         self.load_history()
 
-# SettingsWindowクラス
+    @staticmethod
+    def get_startup_folder_path():
+        # PowerShellを使ってスタートアップフォルダのパスを取得
+        try:
+            startup_path = subprocess.check_output(
+                ["powershell", "-Command", "echo $((New-Object -ComObject WScript.Shell).SpecialFolders('Startup'))"],
+                text=True
+            ).strip()
+            return startup_path
+        except subprocess.CalledProcessError as e:
+            print(f"エラー: {e}")
+            return None
+
+    def is_shortcut_created(self, shortcut_name):
+        startup_dir = self.get_startup_folder_path()  # self を使用して静的メソッドを呼び出す
+        shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
+        return os.path.exists(shortcut_path)
 class SettingsWindow(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.thread = None
-        self.databaseHandler = None
+        # DatabaseHandlerのインスタンスを作成（self.parentを引数として渡す）
+        self.databaseHandler = DatabaseHandler(self.parent, load_history=False)
         self.shortcutCheckbox = None
-        self.parent = parent
         self.init_ui()
 
     def init_ui(self):
         # このメソッドでは、設定ウィンドウのUIコンポーネントが定義されます。
-
         # ウィンドウのタイトルとアイコンを設定
         self.setWindowTitle('設定')
         self.setWindowIcon(QtGui.QIcon('app2.ico'))
 
         # ウィンドウの位置とサイズを設定
         self.setGeometry(300, 300, 300, 200)
+
         # ショートカット作成のチェックボックスを追加
         self.shortcutCheckbox = QtWidgets.QCheckBox('ショートカットを作成', self)
         self.shortcutCheckbox.setGeometry(10, 10, 280, 30)
 
         # DatabaseHandlerを使用して、ショートカット作成フラグを設定
         self.databaseHandler = DatabaseHandler(self, load_history=False)
+        # ショートカットが作成されているかどうかを確認
         if self.databaseHandler.is_shortcut_created("MyPyQtApp"):
             self.shortcutCheckbox.setChecked(True)
-
-        # ショートカットが作成されているかどうかを確認し、
-        # 作成されている場合はチェックボックスをオンに設定
-        if self.databaseHandler.is_shortcut_created("MyPyQtApp"):
-            self.shortcutCheckbox.setChecked(True)
-
         # OKボタンの設定
         ok_button = QtWidgets.QPushButton('OK', self)
         ok_button.setGeometry(10, 150, 280, 30)
-        ok_button.clicked.connect(self.on_ok_clicked)  # OKボタンのクリックイベントに新しいメソッドを紐付ける
+        ok_button.clicked.connect(self.on_ok_clicked)
 
-        # 履歴をクリアするボタン
+        # 履歴をクリアするボタンの設定
         clear_button = QtWidgets.QPushButton('履歴をクリア', self)
-        clear_button.setGeometry(10, 50, 280, 30)  # ボタンの位置を調整
-        clear_button.clicked.connect(self.parent.clearHistory)
+        clear_button.setGeometry(10, 50, 280, 30)
+        clear_button.clicked.connect(self.on_clear_history_clicked)
 
-    # ショートカットを作成する関数
+    def on_clear_history_clicked(self):
+        # MainWindow の clear_history メソッドを呼び出す
+        self.parent().clear_history()
+
     def create_shortcut(self):
-        if self.shortcutCheckbox.isChecked():  # ショートカット作成チェックボックスがチェックされているか確認
-            app_path = os.path.abspath(sys.argv[0])  # アプリケーションの実行パスを取得
-            shortcut_name = "MyPyQtApp"  # 作成するショートカットの名前を指定
+        if self.shortcutCheckbox.isChecked():
+            app_path = os.path.abspath(sys.argv[0])
+            shortcut_name = "MyPyQtApp"
+            startup_dir = DatabaseHandler.get_startup_folder_path()  # DatabaseHandler クラスから直接呼び出す
+            shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
 
-            # ShortcutCreationThreadを作成し、必要なシグナルに接続
-            self.thread = ShortcutCreationThread(app_path, shortcut_name)
-            self.thread.shortcutCreated.connect(self.shortcut_created)  # ショートカット作成成功時のコールバックを設定
-            self.thread.shortcutCreationFailed.connect(self.shortcut_creation_failed)  # ショートカット作成失敗時のコールバックを設定
-            self.thread.start()  # スレッドを開始
+            # ショートカットを作成するコード
+            powershell_script = f"$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('{shortcut_path}'); $s.TargetPath = '{app_path}'; $s.Save()"
+            subprocess.run(["powershell", "-Command", powershell_script], check=True)
 
-    def shortcut_created(self):
-        QMessageBox.information(self, "ショートカット作成", "ショートカットが正常に作成されました。")
-
-    def shortcut_creation_failed(self, error):
-        QMessageBox.warning(self, "エラー", f"ショートカットの作成中にエラーが発生しました: {error}")
-
-    @staticmethod
-    def is_shortcut_created(shortcut_name):
-        """
-        指定されたショートカット名のファイルがWindowsのスタートアップフォルダ内に存在するか確認するメソッド。
-
-        :param shortcut_name: 確認するショートカットの名前。
-        :return: ショートカットが存在する場合はTrue、そうでない場合はFalseを返す。
-        """
-        # スタートアップフォルダのパスを取得
-        startup_dir = winshell.startup()
-
-        # ショートカットの完全なパスを構築
-        shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
-
-        # ショートカットファイルが存在するかどうかを確認
-        return os.path.exists(shortcut_path)
+            QMessageBox.information(self, "ショートカット作成", "ショートカットが正常に作成されました。")
 
     def delete_shortcut(self):
-        shortcut_name = "MyPyQtApp"  # 削除するショートカットの名前を指定
-        try:
-            startup_dir = winshell.startup()  # スタートアップフォルダのパスを取得
-            shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")  # ショートカットファイルのパスを構築
+        shortcut_name = "MyPyQtApp"
+        startup_dir = DatabaseHandler.get_startup_folder_path()  # DatabaseHandler クラスから直接呼び出す
+        shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
 
-            if os.path.exists(shortcut_path):  # ショートカットファイルが存在するか確認
-                os.remove(shortcut_path)  # ショートカットファイルを削除
-                QMessageBox.information(self, "ショートカット削除",
-                    "ショートカットが正常に削除されました。")  # 削除完了のメッセージを表示
-        except Exception as e:
-            QMessageBox.warning(self, "エラー", f"ショートカットの削除中にエラーが発生しました: {e}")  # エラーメッセージを表示
+        # ショートカットが存在するか確認
+        if os.path.exists(shortcut_path):
+            os.remove(shortcut_path)  # ショートカットを削除
+            QMessageBox.information(self, "ショートカット削除", "ショートカットが正常に削除されました。")
+        else:
+            QMessageBox.information(self, "ショートカット削除", "ショートカットは存在しません。")
+
+        if os.path.exists(shortcut_path):
+            os.remove(shortcut_path)
+            QMessageBox.information(self, "ショートカット削除", "ショートカットが正常に削除されました。")
 
     def on_ok_clicked(self):
         # チェックボックスがチェックされているか確認
@@ -318,14 +299,12 @@ class SettingsWindow(QtWidgets.QDialog):
             self.create_shortcut()
         else:
             # ショートカットが存在する場合は削除
-            if self.is_shortcut_created("MyPyQtApp"):
-                self.delete_shortcut()
+            self.delete_shortcut()
 
         # DBハンドラーを閉じる
         self.databaseHandler.close()
         # 設定ウィンドウを閉じる
         self.close()
-
 
 class ShortcutCreationThread(QThread):
     shortcutCreated = QtCore.pyqtSignal()  # ショートカットが正常に作成されたときに発信するシグナル
@@ -360,14 +339,6 @@ class ShortcutCreationThread(QThread):
 
 
 # SettingsWindowクラスの create_shortcut メソッドの変更
-def create_shortcut(self):
-    if self.shortcutCheckbox.isChecked():  # ショートカット作成のチェックボックスがチェックされているか確認
-        app_path = os.path.abspath(sys.argv[0])  # アプリケーションの実行パスを取得
-        shortcut_name = "MyPyQtApp"  # ショートカットの名前
-        self.thread = ShortcutCreationThread(app_path, shortcut_name)  # ショートカット作成用スレッドを作成
-        self.thread.shortcutCreated.connect(self.shortcut_created)  # ショートカット作成成功時のシグナルを接続
-        self.thread.shortcutCreationFailed.connect(self.shortcut_creation_failed)  # ショートカット作成エラー時のシグナルを接続
-        self.thread.start()  # スレッドを開始
 
 
 def shortcut_created(self):
