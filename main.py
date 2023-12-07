@@ -207,11 +207,17 @@ class DatabaseHandler:
 
     @staticmethod
     def get_startup_folder_path():
+        # Windowsでコンソールウィンドウを表示せずにプロセスを実行するための設定
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+
         # PowerShellを使ってスタートアップフォルダのパスを取得
         try:
             startup_path = subprocess.check_output(
                 ["powershell", "-Command", "echo $((New-Object -ComObject WScript.Shell).SpecialFolders('Startup'))"],
-                text=True
+                text=True,
+                startupinfo=startupinfo
             ).strip()
             return startup_path
         except subprocess.CalledProcessError as e:
@@ -270,9 +276,14 @@ class SettingsWindow(QtWidgets.QDialog):
             startup_dir = DatabaseHandler.get_startup_folder_path()  # DatabaseHandler クラスから直接呼び出す
             shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
 
+            # PowerShellウィンドウを非表示にする設定
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+
             # ショートカットを作成するコード
             powershell_script = f"$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('{shortcut_path}'); $s.TargetPath = '{app_path}'; $s.Save()"
-            subprocess.run(["powershell", "-Command", powershell_script], check=True)
+            subprocess.run(["powershell", "-Command", powershell_script], startupinfo=startupinfo, check=True)
 
             QMessageBox.information(self, "ショートカット作成", "ショートカットが正常に作成されました。")
 
