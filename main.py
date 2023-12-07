@@ -85,9 +85,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # 履歴をクリアする処理を実装
         self.databaseHandler.clear_history()
         QMessageBox.information(self, "履歴クリア", "履歴がクリアされました。")
+
     def load_history_from_db(self):
-        history_data = self.databaseHandler.load_history()
-        self.update_combo_box(history_data)
+        self.historyLoadingThread = HistoryLoadingThread()
+        self.historyLoadingThread.historyLoaded.connect(self.update_combo_box)
+        self.historyLoadingThread.start()
 
     def open_file(self):
         """
@@ -130,6 +132,10 @@ class MainWindow(QtWidgets.QMainWindow):
             for item in items:
                 self.comboBox.addItem(item)
 
+    def closeEvent(self, event):
+        if self.historyLoadingThread.isRunning():
+            self.historyLoadingThread.terminate()
+        event.accept()
 
 # DB関連
 
@@ -306,19 +312,23 @@ class SettingsWindow(QtWidgets.QDialog):
             main_window.update_combo_box(history_data)
         else:
             QMessageBox.warning(self, "エラー", "親ウィンドウの参照が不正です。")
+
     def on_ok_clicked(self):
         # チェックボックスがチェックされているか確認
         if self.shortcutCheckbox.isChecked():
-            # ショートカットを作成
-            self.create_shortcut()
+            # ショートカットが既に存在するか確認
+            if not self.databaseHandler.is_shortcut_created("OutlookFilePathOpener"):
+                # ショートカットが存在しない場合、ショートカットを作成
+                self.create_shortcut()
         else:
-            # ショートカットが存在する場合は削除
+            # チェックボックスが未チェックの場合、ショートカットを削除
             self.delete_shortcut()
 
         # DBハンドラーを閉じる
         self.databaseHandler.close()
         # 設定ウィンドウを閉じる
         self.close()
+
 
 class ShortcutCreationThread(QThread):
     shortcutCreated = QtCore.pyqtSignal()
@@ -374,6 +384,26 @@ class OpenFileThread(QThread):
         else:
             # 無効なパスまたはコマンドの場合、エラーを通知
             self.errorOccurred.emit("無効なパスまたはコマンドです")
+
+
+class HistoryLoadingThread(QThread):
+    historyLoaded = QtCore.pyqtSignal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def run(self):
+        try:
+            conn = sqlite3.connect('settings.db')
+            cursor = conn.cursor()
+            # DISTINCT を使用して重複を除外
+            cursor.execute('SELECT DISTINCT command FROM history ORDER BY ROWID DESC LIMIT 6')
+            history_data = [row[0] for row in cursor.fetchall()]
+            self.historyLoaded.emit(history_data)
+        except Exception as e:
+            print(f"履歴の読み込み中にエラーが発生しました: {e}")
+        finally:
+            conn.close()
 
 
 # MainWindowの open_file メソッドで使用される subprocess.Popen も、
