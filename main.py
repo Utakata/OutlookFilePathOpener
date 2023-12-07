@@ -4,7 +4,6 @@ import sqlite3
 import subprocess
 import sys
 
-import pythoncom
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import QThread
 from PyQt5.QtWidgets import QMessageBox
@@ -21,7 +20,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.iconLabel = None
         self.comboBox = None
         self.init_ui()
-
+        self.databaseHandler = DatabaseHandler(self)
+        self.load_history_from_db()
     def init_ui(self):
         # ウィンドウの設定
         self.setWindowTitle('ファイル名を指定して実行')  # ウィンドウのタイトルを設定
@@ -101,6 +101,7 @@ class MainWindow(QtWidgets.QMainWindow):
             path = path[7:]  # file:// を削除
 
         # OpenFileThread スレッドを起動してファイルを開く
+        self.databaseHandler.save_history(path)  # 入力されたパスを履歴に保存
         self.fileOpeningThread = OpenFileThread(path)
         self.fileOpeningThread.errorOccurred.connect(self.show_error_message)
         self.fileOpeningThread.start()
@@ -124,9 +125,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def update_combo_box(self, items):
         """コンボボックスを更新するメソッド"""
-        self.comboBox.clear()
-        for item in items:
-            self.comboBox.addItem(item)
+        self.comboBox.clear()  # この行は関数の内部にあるため、インデントが必要です。
+        if items is not None:
+            for item in items:
+                self.comboBox.addItem(item)
 
 
 # DB関連
@@ -164,7 +166,7 @@ class DatabaseHandler:
         # 履歴データを取得して、親ウィンドウのメソッドを通じてコンボボックスに設定
         self.cursor.execute('SELECT command FROM history ORDER BY ROWID DESC LIMIT 6')
         history_data = [row[0] for row in self.cursor.fetchall()]
-        self.parent.update_combo_box(history_data)  # 親ウィンドウのメソッドを呼び出してコンボボックスにデータを設定
+        return history_data  # 追加: 履歴データを返す
 
     def load_shortcut_flag(self):
         self.cursor.execute('SELECT created FROM shortcut')
@@ -247,13 +249,13 @@ class SettingsWindow(QtWidgets.QDialog):
         self.setGeometry(300, 300, 300, 200)
 
         # ショートカット作成のチェックボックスを追加
-        self.shortcutCheckbox = QtWidgets.QCheckBox('ショートカットを作成', self)
+        self.shortcutCheckbox = QtWidgets.QCheckBox('PC起動時に自動起動をONにする', self)
         self.shortcutCheckbox.setGeometry(10, 10, 280, 30)
 
         # DatabaseHandlerを使用して、ショートカット作成フラグを設定
         self.databaseHandler = DatabaseHandler(self, load_history=False)
         # ショートカットが作成されているかどうかを確認
-        if self.databaseHandler.is_shortcut_created("MyPyQtApp"):
+        if self.databaseHandler.is_shortcut_created("OutlookFilePathOpener"):
             self.shortcutCheckbox.setChecked(True)
         # OKボタンの設定
         ok_button = QtWidgets.QPushButton('OK', self)
@@ -265,44 +267,45 @@ class SettingsWindow(QtWidgets.QDialog):
         clear_button.setGeometry(10, 50, 280, 30)
         clear_button.clicked.connect(self.on_clear_history_clicked)
 
-    def on_clear_history_clicked(self):
-        # MainWindow の clear_history メソッドを呼び出す
-        self.parent().clear_history()
-
     def create_shortcut(self):
         if self.shortcutCheckbox.isChecked():
-            app_path = os.path.abspath(sys.argv[0])
-            shortcut_name = "MyPyQtApp"
-            startup_dir = DatabaseHandler.get_startup_folder_path()  # DatabaseHandler クラスから直接呼び出す
-            shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
+            self.thread = ShortcutCreationThread()
+            self.thread.shortcutCreated.connect(self.on_shortcut_created)
+            self.thread.shortcutCreationFailed.connect(self.on_shortcut_creation_failed)
+            self.thread.start()
 
-            # PowerShellウィンドウを非表示にする設定
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
+    def on_shortcut_created(self):
+        QMessageBox.information(self, "PC起動時に自動起動をONにする", "自動起動用ショートカットが正常に作成されました。")
 
-            # ショートカットを作成するコード
-            powershell_script = f"$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('{shortcut_path}'); $s.TargetPath = '{app_path}'; $s.Save()"
-            subprocess.run(["powershell", "-Command", powershell_script], startupinfo=startupinfo, check=True)
-
-            QMessageBox.information(self, "ショートカット作成", "ショートカットが正常に作成されました。")
+    def on_shortcut_creation_failed(self, error):
+        QMessageBox.warning(self, "エラー", f"自動起動用ショートカットの作成中にエラーが発生しました: {error}")
 
     def delete_shortcut(self):
-        shortcut_name = "MyPyQtApp"
+        shortcut_name = "OutlookFilePathOpener"
         startup_dir = DatabaseHandler.get_startup_folder_path()  # DatabaseHandler クラスから直接呼び出す
         shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
 
         # ショートカットが存在するか確認
         if os.path.exists(shortcut_path):
             os.remove(shortcut_path)  # ショートカットを削除
-            QMessageBox.information(self, "ショートカット削除", "ショートカットが正常に削除されました。")
+            QMessageBox.information(self, "PC起動時に自動起動をOFFにする",
+                "自動起動用ショートカットが正常に削除されました。")
         else:
-            QMessageBox.information(self, "ショートカット削除", "ショートカットは存在しません。")
+            QMessageBox.information(self, "PC起動時に自動起動をOFFにする", "自動起動用ショートカットは存在しません。")
 
-        if os.path.exists(shortcut_path):
-            os.remove(shortcut_path)
-            QMessageBox.information(self, "ショートカット削除", "ショートカットが正常に削除されました。")
+    def on_clear_history_clicked(self):
+        # 履歴をクリアする処理を実装
+        self.databaseHandler.clear_history()
+        QMessageBox.information(self, "履歴クリア", "履歴がクリアされました。")
 
+        # MainWindow インスタンスのコンボボックスを更新
+        main_window = self.parent()
+        if isinstance(main_window, MainWindow):
+            # 履歴データを再読み込みし、コンボボックスを更新
+            history_data = self.databaseHandler.load_history()
+            main_window.update_combo_box(history_data)
+        else:
+            QMessageBox.warning(self, "エラー", "親ウィンドウの参照が不正です。")
     def on_ok_clicked(self):
         # チェックボックスがチェックされているか確認
         if self.shortcutCheckbox.isChecked():
@@ -318,46 +321,36 @@ class SettingsWindow(QtWidgets.QDialog):
         self.close()
 
 class ShortcutCreationThread(QThread):
-    shortcutCreated = QtCore.pyqtSignal()  # ショートカットが正常に作成されたときに発信するシグナル
-    shortcutCreationFailed = QtCore.pyqtSignal(str)  # ショートカットの作成中にエラーが発生したときに発信するシグナル
-
-    def __init__(self, app_path, shortcut_name):
-        super().__init__()
-        self.app_path = app_path  # アプリケーションのパス
-        self.shortcut_name = shortcut_name  # ショートカットの名前
+    shortcutCreated = QtCore.pyqtSignal()
+    shortcutCreationFailed = QtCore.pyqtSignal(str)
 
     def run(self):
-        # COM ライブラリを初期化
-        pythoncom.CoInitialize()
+        app_path = os.path.abspath(sys.argv[0])
+        shortcut_name = "OutlookFilePathOpener"
+        startup_dir = DatabaseHandler.get_startup_folder_path()
+        shortcut_path = os.path.join(startup_dir, f"{shortcut_name}.lnk")
+
+        powershell_script = f"$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('{shortcut_path}'); $s.TargetPath = '{app_path}'; $s.Save()"
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
 
         try:
-            # Windowsのスタートアップフォルダを取得
-            startup_dir = winshell.startup()
-            # ショートカットファイルのパスを構築
-            shortcut_path = os.path.join(startup_dir, f"{self.shortcut_name}.lnk")
-            # ショートカットを作成および設定
-            with winshell.shortcut(shortcut_path) as shortcut:
-                shortcut.path = self.app_path  # アプリケーションの実行パスを設定
-                shortcut.working_directory = os.path.dirname(self.app_path)  # 作業ディレクトリを設定
-                shortcut.description = self.shortcut_name  # ショートカットの説明を設定
-                shortcut.write()  # ショートカットを書き込む
-            self.shortcutCreated.emit()  # ショートカット作成が成功したことを通知
-        except Exception as e:
-            self.shortcutCreationFailed.emit(str(e))  # エラーが発生したことを通知
-        finally:
-            # COM ライブラリを終了
-            pythoncom.CoUninitialize()
+            subprocess.run(["powershell", "-Command", powershell_script], startupinfo=startupinfo, check=True)
+            self.shortcutCreated.emit()
+        except subprocess.CalledProcessError as e:
+            self.shortcutCreationFailed.emit(str(e))
 
 
 # SettingsWindowクラスの create_shortcut メソッドの変更
 
 
 def shortcut_created(self):
-    QMessageBox.information(self, "ショートカット作成", "ショートカットが正常に作成されました。")
+    QMessageBox.information(self, "自動起動をONにする。", "自動起動用ショートカットが正常に作成されました。")
 
 
 def shortcut_creation_failed(self, error):
-    QMessageBox.warning(self, "エラー", f"ショートカットの作成中にエラーが発生しました: {error}")
+    QMessageBox.warning(self, "エラー", f"自動起動用ショートカットの作成中にエラーが発生しました: {error}")
 
 
 class OpenFileThread(QThread):
