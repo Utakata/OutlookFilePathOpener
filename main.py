@@ -122,9 +122,27 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # 設定ウィンドウを開く機能
     def open_settings(self):
-        settings_window = SettingsWindow(self)  # self を渡して MainWindow を親として設定
-        settings_window.exec_()
+        # メインウインドウを暗くする
+        self.setWindowOpacity(0.5)  # 透明度を下げる
 
+        settings_window = SettingsWindow(self)
+        settings_window.setWindowModality(QtCore.Qt.ApplicationModal)  # モーダルダイアログとして設定
+
+        # メインウインドウの位置とサイズを取得
+        main_window_geometry = self.geometry()
+        settings_window_width = settings_window.frameGeometry().width()
+        settings_window_height = settings_window.frameGeometry().height()
+
+        # 設定ウインドウをメインウインドウの近くに配置（整数に変換）
+        settings_window_x = int(main_window_geometry.x() + (main_window_geometry.width() - settings_window_width) / 2)
+        settings_window_y = int(main_window_geometry.y() + (main_window_geometry.height() - settings_window_height) / 2)
+
+        settings_window.setGeometry(settings_window_x, settings_window_y, settings_window_width, settings_window_height)
+
+        settings_window.exec_()  # モーダルダイアログを実行
+
+        # ダイアログが閉じられたら、ウィンドウの透明度を元に戻す
+        self.setWindowOpacity(1.0)
     def update_combo_box(self, items):
         """コンボボックスを更新するメソッド"""
         self.comboBox.clear()  # この行は関数の内部にあるため、インデントが必要です。
